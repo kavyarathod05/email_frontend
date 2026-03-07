@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { API_BASE } from "../config";
 
 export default function TestPanel() {
@@ -7,6 +7,15 @@ export default function TestPanel() {
   const [company, setCompany] = useState("Test Inc");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState(null);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+
+  useEffect(() => {
+    fetch(`${API_BASE}/templates`)
+      .then((res) => res.json())
+      .then(setTemplates)
+      .catch(console.error);
+  }, []);
 
   const handleTest = async (templateType) => {
     if (!email) {
@@ -21,7 +30,51 @@ export default function TestPanel() {
       const res = await fetch(`${API_BASE}/test-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name, company, templateType }),
+        body: JSON.stringify({
+          email,
+          name,
+          company,
+          templateType,
+          templateId: selectedTemplateId || null,
+        }),
+      });
+      const data = await res.json();
+      setResponse(data);
+    } catch (err) {
+      setResponse({ error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSimulateOpen = async () => {
+    if (!email) {
+      setResponse({ error: "Please enter an email address" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/test/open/${email}`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      setResponse(data);
+    } catch (err) {
+      setResponse({ error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSimulateClick = async () => {
+    if (!email) {
+      setResponse({ error: "Please enter an email address" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/test/click/${email}`, {
+        method: "POST",
       });
       const data = await res.json();
       setResponse(data);
@@ -135,6 +188,64 @@ export default function TestPanel() {
         </div>
       </div>
 
+      <div style={{ marginBottom: "24px" }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "13px",
+            fontWeight: "600",
+            marginBottom: "6px",
+            color: "var(--text-muted)",
+          }}
+        >
+          Select Custom Template from DB (Overrides .env default)
+        </label>
+        <select
+          value={selectedTemplateId}
+          onChange={(e) => setSelectedTemplateId(e.target.value)}
+          style={{
+            boxSizing: "border-box",
+            width: "100%",
+            padding: "8px 12px",
+            borderRadius: "6px",
+            border: "1px solid var(--border)",
+            fontFamily: "inherit",
+          }}
+        >
+          <option value="">-- No DB Template (Use .env Default) --</option>
+
+          <optgroup label="Initial Email Templates">
+            {templates
+              .filter((t) => t.type === "initial" || !t.type)
+              .map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+          </optgroup>
+
+          <optgroup label="Follow-up 1 Templates">
+            {templates
+              .filter((t) => t.type === "followup1")
+              .map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+          </optgroup>
+
+          <optgroup label="Breakup Templates">
+            {templates
+              .filter((t) => t.type === "breakup")
+              .map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+          </optgroup>
+        </select>
+      </div>
+
       <div
         style={{
           display: "flex",
@@ -165,6 +276,32 @@ export default function TestPanel() {
           style={{ background: "#bd1a38" }}
         >
           {loading ? "Sending..." : "Send Breakup"}
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "12px",
+          marginBottom: "24px",
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          className="tab-btn"
+          onClick={handleSimulateOpen}
+          disabled={loading}
+          style={{ padding: "8px 16px", background: "var(--card-bg)" }}
+        >
+          Simulate Open
+        </button>
+        <button
+          className="tab-btn"
+          onClick={handleSimulateClick}
+          disabled={loading}
+          style={{ padding: "8px 16px", background: "var(--card-bg)" }}
+        >
+          Simulate Click
         </button>
       </div>
 

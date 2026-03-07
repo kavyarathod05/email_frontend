@@ -3,6 +3,8 @@ import Stats from "../components/Stats";
 import RecruiterTable from "../components/RecruiterTable";
 import CsvUpload from "../components/CsvUpload";
 import TestPanel from "../components/TestPanel";
+import TemplateManager from "../components/TemplateManager";
+import AnalyticsCharts from "../components/AnalyticsCharts";
 import "../style.css";
 
 export default function Dashboard() {
@@ -24,6 +26,18 @@ export default function Dashboard() {
           onClick={() => setActiveTab("overview")}
         >
           Overview & Stats
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "analytics" ? "active" : ""}`}
+          onClick={() => setActiveTab("analytics")}
+        >
+          Analytics
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "templates" ? "active" : ""}`}
+          onClick={() => setActiveTab("templates")}
+        >
+          Templates
         </button>
         <button
           className={`tab-btn ${activeTab === "recruiters" ? "active" : ""}`}
@@ -49,6 +63,18 @@ export default function Dashboard() {
         {activeTab === "overview" && (
           <div className="fade-in">
             <Stats />
+          </div>
+        )}
+
+        {activeTab === "analytics" && (
+          <div className="fade-in">
+            <AnalyticsCharts />
+          </div>
+        )}
+
+        {activeTab === "templates" && (
+          <div className="fade-in">
+            <TemplateManager />
           </div>
         )}
 
