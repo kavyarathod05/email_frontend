@@ -6,9 +6,9 @@ export default function Stats() {
 
   useEffect(() => {
     fetch(`${API_BASE}/dashboard/stats`)
-      .then(res => res.json())
+      .then((res) => res.json())
       .then(setStats)
-      .catch(err => console.error(err));
+      .catch((err) => console.error(err));
   }, []);
 
   if (!stats) return <p>Loading stats...</p>;
@@ -19,6 +19,8 @@ export default function Stats() {
       <Stat label="Sent" value={stats.sent} />
       <Stat label="Replied" value={stats.replied} />
       <Stat label="New" value={stats.new} />
+      <Stat label="Errors" value={stats.errors || 0} />
+      <Stat label="Followups" value={stats.followups || 0} />
     </div>
   );
 }
@@ -32,7 +34,7 @@ function Stat({ label, value }) {
         borderRadius: "8px",
         minWidth: "110px",
         textAlign: "center",
-        background: "#fafafa"
+        background: "#fafafa",
       }}
     >
       <h2>{value}</h2>
