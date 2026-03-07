@@ -14,13 +14,22 @@ export default function Stats() {
   if (!stats) return <p>Loading stats...</p>;
 
   return (
-    <div style={{ display: "flex", gap: "20px", marginBottom: "20px" }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+        gap: "20px",
+        marginBottom: "24px",
+      }}
+    >
       <Stat label="Total" value={stats.total} />
       <Stat label="Sent" value={stats.sent} />
       <Stat label="Replied" value={stats.replied} />
       <Stat label="New" value={stats.new} />
       <Stat label="Errors" value={stats.errors || 0} />
       <Stat label="Followups" value={stats.followups || 0} />
+      <Stat label="Opened" value={stats.opened || 0} />
+      <Stat label="Clicked" value={stats.clicked || 0} />
     </div>
   );
 }
@@ -28,17 +37,34 @@ export default function Stats() {
 function Stat({ label, value }) {
   return (
     <div
+      className="card"
       style={{
-        border: "1px solid #ccc",
-        padding: "16px",
-        borderRadius: "8px",
-        minWidth: "110px",
+        padding: "20px",
         textAlign: "center",
-        background: "#fafafa",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
       }}
     >
-      <h2>{value}</h2>
-      <p>{label}</p>
+      <h2
+        style={{
+          fontSize: "32px",
+          margin: "0 0 8px 0",
+          color: "var(--primary)",
+        }}
+      >
+        {value}
+      </h2>
+      <p
+        style={{
+          margin: 0,
+          color: "var(--text-muted)",
+          fontSize: "14px",
+          fontWeight: "500",
+        }}
+      >
+        {label}
+      </p>
     </div>
   );
 }

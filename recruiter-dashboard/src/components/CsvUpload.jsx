@@ -44,24 +44,18 @@ export default function CsvUpload() {
   };
 
   return (
-    <div
-      style={{
-        marginBottom: "20px",
-        padding: "16px",
-        border: "1px solid #ccc",
-        borderRadius: "8px",
-        background: "#fafafa",
-      }}
-    >
-      <h3>Upload Recruiters CSV</h3>
+    <div className="card" style={{ marginBottom: "24px" }}>
+      <h3 style={{ marginTop: 0, marginBottom: "16px" }}>
+        Upload Recruiters CSV
+      </h3>
       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
         <input type="file" accept=".csv" onChange={handleFileChange} />
         <button
+          className="primary-btn"
           onClick={handleUpload}
           disabled={loading || !file}
-          style={{ padding: "6px 12px" }}
         >
-          {loading ? "Uploading..." : "Upload"}
+          {loading ? "Uploading..." : "Upload CSV"}
         </button>
       </div>
       {message && (
