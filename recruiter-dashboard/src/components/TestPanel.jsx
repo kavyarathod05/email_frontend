@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { API_BASE } from "../config";
 
 export default function TestPanel() {
@@ -9,6 +9,7 @@ export default function TestPanel() {
   const [response, setResponse] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const sendCountRef = useRef({ initial: 0, followup1: 0, breakup: 0 });
 
   useEffect(() => {
     fetch(`${API_BASE}/templates`)
@@ -27,6 +28,23 @@ export default function TestPanel() {
     setResponse(null);
 
     try {
+      // Round-robin: if no template explicitly selected, cycle through DB templates
+      let templateId = selectedTemplateId || null;
+
+      if (!templateId) {
+        const typeTemplates = templates.filter((t) => {
+          if (templateType === "initial")
+            return t.type === "initial" || !t.type;
+          return t.type === templateType;
+        });
+
+        if (typeTemplates.length > 0) {
+          const idx = sendCountRef.current[templateType] % typeTemplates.length;
+          templateId = typeTemplates[idx]._id;
+          sendCountRef.current[templateType]++;
+        }
+      }
+
       const res = await fetch(`${API_BASE}/test-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -35,10 +53,15 @@ export default function TestPanel() {
           name,
           company,
           templateType,
-          templateId: selectedTemplateId || null,
+          templateId,
         }),
       });
       const data = await res.json();
+      // Show which template was used
+      if (templateId && !selectedTemplateId) {
+        const usedTemplate = templates.find((t) => t._id === templateId);
+        data._rotatedTemplate = usedTemplate?.name || templateId;
+      }
       setResponse(data);
     } catch (err) {
       setResponse({ error: err.message });
@@ -198,7 +221,7 @@ export default function TestPanel() {
             color: "var(--text-muted)",
           }}
         >
-          Select Custom Template from DB (Overrides .env default)
+          Select Template (auto-rotates when none selected)
         </label>
         <select
           value={selectedTemplateId}
@@ -212,7 +235,7 @@ export default function TestPanel() {
             fontFamily: "inherit",
           }}
         >
-          <option value="">-- No DB Template (Use .env Default) --</option>
+          <option value="">-- Auto-Rotate All Templates --</option>
 
           <optgroup label="Initial Email Templates">
             {templates
