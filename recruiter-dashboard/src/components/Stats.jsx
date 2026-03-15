@@ -17,8 +17,8 @@ export default function Stats() {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-        gap: "20px",
+        gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+        gap: "16px",
         marginBottom: "24px",
       }}
     >
@@ -26,6 +26,8 @@ export default function Stats() {
       <Stat label="Sent" value={stats.sent} />
       <Stat label="Replied" value={stats.replied} />
       <Stat label="New" value={stats.new} />
+      <Stat label="Fake" value={stats.fake || 0} color="#b91c1c" />
+      <Stat label="Risky" value={stats.risky || 0} color="#854d0e" />
       <Stat label="Errors" value={stats.errors || 0} />
       <Stat label="Followups" value={stats.followups || 0} />
       <Stat label="Opened" value={stats.opened || 0} />
@@ -34,23 +36,24 @@ export default function Stats() {
   );
 }
 
-function Stat({ label, value }) {
+function Stat({ label, value, color }) {
   return (
     <div
       className="card"
       style={{
-        padding: "20px",
+        padding: "16px",
         textAlign: "center",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
+        borderTop: color ? `4px solid ${color}` : "1px solid var(--border)",
       }}
     >
       <h2
         style={{
-          fontSize: "32px",
-          margin: "0 0 8px 0",
-          color: "var(--primary)",
+          fontSize: "28px",
+          margin: "0 0 4px 0",
+          color: color || "var(--primary)",
         }}
       >
         {value}

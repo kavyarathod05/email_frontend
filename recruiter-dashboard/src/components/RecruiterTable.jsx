@@ -100,12 +100,22 @@ export default function RecruiterTable() {
             ) : (
               filteredData.map((r) => (
                 <tr key={r._id}>
-                  <td style={{ fontWeight: "500", color: "var(--text-main)" }}>
+                  <td style={{ 
+                    fontWeight: "500", 
+                    color: r.is_fake ? "#b91c1c" : r.is_risky ? "#854d0e" : "var(--text-main)",
+                    backgroundColor: r.is_fake ? "#fef2f2" : r.is_risky ? "#fefce8" : "transparent",
+                    borderRadius: "4px",
+                    padding: "4px 8px"
+                  }}>
                     {r.email}
+                    {r.is_fake && <span style={{fontSize: '10px', marginLeft: '6px', opacity: 0.7}}>(Fake)</span>}
+                    {r.is_risky && <span style={{fontSize: '10px', marginLeft: '6px', opacity: 0.7}}>(Risky)</span>}
                   </td>
                   <td>{r.company || "-"}</td>
                   <td>
-                    <span className={`badge ${r.status}`}>{r.status}</span>
+                    <span className={`badge ${r.status} ${r.is_fake ? 'fake' : r.is_risky ? 'risky' : ''}`}>
+                      {r.is_fake ? 'fake' : r.is_risky ? 'risky' : r.status}
+                    </span>
                   </td>
                   <td>
                     {r.replyAt ? new Date(r.replyAt).toLocaleString() : "-"}
