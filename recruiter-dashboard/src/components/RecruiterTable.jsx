@@ -26,6 +26,8 @@ export default function RecruiterTable() {
     if (filter === "clicked") return r.clicked;
     if (filter === "followup") return r.followupSent;
     if (filter === "error") return r.status === "error";
+    if (filter === "top_tier") return r.companyType === "top_tier";
+    if (filter === "startup") return r.companyType === "startup";
     return true; // "all"
   });
 
@@ -41,7 +43,7 @@ export default function RecruiterTable() {
           flexWrap: "wrap",
         }}
       >
-        {["all", "replied", "opened", "clicked", "followup", "error"].map(
+        {["all", "top_tier", "startup", "replied", "opened", "clicked", "followup", "error"].map(
           (f) => (
             <button
               key={f}
@@ -62,7 +64,7 @@ export default function RecruiterTable() {
                 transition: "all 0.2s ease",
               }}
             >
-              {f}
+              {f.replace("_", " ")}
             </button>
           ),
         )}
@@ -111,7 +113,19 @@ export default function RecruiterTable() {
                     {r.is_fake && <span style={{fontSize: '10px', marginLeft: '6px', opacity: 0.7}}>(Fake)</span>}
                     {r.is_risky && <span style={{fontSize: '10px', marginLeft: '6px', opacity: 0.7}}>(Risky)</span>}
                   </td>
-                  <td>{r.company || "-"}</td>
+                  <td>
+                    {r.company || "-"}
+                    <div style={{ marginTop: "4px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                      {r.companyType === "top_tier" ? (
+                        <span style={{ fontSize: "10px", padding: "2px 6px", background: "#e0e7ff", color: "#3730a3", borderRadius: "10px", fontWeight: 600 }}>Top Tier</span>
+                      ) : (
+                        <span style={{ fontSize: "10px", padding: "2px 6px", background: "#f3f4f6", color: "#4b5563", borderRadius: "10px", fontWeight: 600 }}>Startup</span>
+                      )}
+                      {r.companyType === "top_tier" && ["sent", "replied", "error"].includes(r.status) && (
+                        <span style={{ fontSize: "10px", padding: "2px 6px", background: "#dcfce7", color: "#166534", borderRadius: "10px", fontWeight: 600 }}>✨ AI Sent</span>
+                      )}
+                    </div>
+                  </td>
                   <td>
                     <span className={`badge ${r.status} ${r.is_fake ? 'fake' : r.is_risky ? 'risky' : ''}`}>
                       {r.is_fake ? 'fake' : r.is_risky ? 'risky' : r.status}

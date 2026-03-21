@@ -23,6 +23,7 @@ export default function Stats() {
       }}
     >
       <Stat label="Total" value={stats.total} />
+      <Stat label="Top Tier" value={stats.top_tier || 0} color="#4f46e5" />
       <Stat label="Sent" value={stats.sent} />
       <Stat label="Replied" value={stats.replied} />
       <Stat label="New" value={stats.new} />
