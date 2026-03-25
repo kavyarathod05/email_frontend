@@ -11,6 +11,10 @@ export default function TestPanel() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const sendCountRef = useRef({ initial: 0, followup1: 0, breakup: 0 });
 
+  // Threaded Test state
+  const [threadMessageId, setThreadMessageId] = useState("");
+  const [threadEmail, setThreadEmail] = useState("");
+
   useEffect(() => {
     fetch(`${API_BASE}/templates`)
       .then((res) => res.json())
@@ -101,6 +105,67 @@ export default function TestPanel() {
       });
       const data = await res.json();
       setResponse(data);
+    } catch (err) {
+      setResponse({ error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleThreadStart = async () => {
+    if (!threadEmail) {
+      setResponse({ error: "Please enter a thread email address" });
+      return;
+    }
+    setLoading(true);
+    setResponse(null);
+    try {
+      const res = await fetch(`${API_BASE}/test-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: threadEmail,
+          name: "Thread Starter",
+          company: "Thread Inc",
+          templateType: "initial",
+        }),
+      });
+      const data = await res.json();
+      setResponse(data);
+      if (data.messageId) {
+        setThreadMessageId(data.messageId);
+      }
+    } catch (err) {
+      setResponse({ error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleThreadFollowup = async () => {
+    if (!threadEmail || !threadMessageId) {
+      setResponse({ error: "Please enter thread email and wait for initial message ID" });
+      return;
+    }
+    setLoading(true);
+    setResponse(null);
+    try {
+      const res = await fetch(`${API_BASE}/test-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: threadEmail,
+          name: "Thread Starter",
+          company: "Thread Inc",
+          templateType: "followup1",
+          inReplyTo: threadMessageId,
+        }),
+      });
+      const data = await res.json();
+      setResponse(data);
+      if (data.messageId) {
+        setThreadMessageId(data.messageId); // Update with new messageId for next followup
+      }
     } catch (err) {
       setResponse({ error: err.message });
     } finally {
@@ -325,6 +390,51 @@ export default function TestPanel() {
           style={{ padding: "8px 16px", background: "var(--card-bg)" }}
         >
           Simulate Click
+        </button>
+      </div>
+
+      <hr style={{ borderColor: 'var(--border)', margin: '32px 0' }} />
+
+      <h3 style={{ marginTop: 0, marginBottom: "8px" }}>Threaded Email Tester</h3>
+      <p
+        style={{
+          color: "var(--text-muted)",
+          marginBottom: "20px",
+          fontSize: "14px",
+        }}
+      >
+        Test follow-up threading. Send an initial email to generate a Message ID, then shoot a follow-up seamlessly into the same thread.
+      </p>
+
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+        <div style={{ flex: 1 }}>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "var(--text-muted)" }}>Email</label>
+            <input
+              type="email"
+              value={threadEmail}
+              onChange={(e) => setThreadEmail(e.target.value)}
+              placeholder="thread-test@example.com"
+              style={{ padding: "8px 12px", width: "100%", borderRadius: "6px", border: "1px solid var(--border)", boxSizing: "border-box" }}
+            />
+        </div>
+        <div style={{ flex: 1 }}>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "var(--text-muted)" }}>Current Message ID</label>
+            <input
+              type="text"
+              readOnly
+              value={threadMessageId}
+              placeholder="Will drop here after initial send..."
+              style={{ padding: "8px 12px", width: "100%", borderRadius: "6px", border: "1px solid var(--border)", boxSizing: "border-box", background: 'rgba(0,0,0,0.1)' }}
+            />
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: "12px", marginBottom: "24px", flexWrap: "wrap" }}>
+        <button className="primary-btn" onClick={handleThreadStart} disabled={loading || !threadEmail}>
+          {loading ? "Sending..." : "1. Send Initial (Start Thread)"}
+        </button>
+        <button className="primary-btn" onClick={handleThreadFollowup} disabled={loading || !threadMessageId} style={{ background: "#4f46e5" }}>
+          {loading ? "Sending..." : "2. Send Follow-up (Reply)"}
         </button>
       </div>
 
