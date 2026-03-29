@@ -10,6 +10,7 @@ export default function TemplateManager() {
     type: "initial",
   });
   const [editingId, setEditingId] = useState(null);
+  const [previewId, setPreviewId] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -267,6 +268,17 @@ export default function TemplateManager() {
                   Edit
                 </button>
                 <button
+                  onClick={() => setPreviewId(previewId === t._id ? null : t._id)}
+                  className="tab-btn"
+                  style={{ 
+                    padding: "4px 12px",
+                    borderColor: previewId === t._id ? "var(--primary)" : "var(--border)",
+                    color: previewId === t._id ? "var(--primary)" : "var(--text-muted)"
+                  }}
+                >
+                  {previewId === t._id ? "Hide Preview" : "Preview"}
+                </button>
+                <button
                   onClick={() => handleDelete(t._id)}
                   className="tab-btn"
                   style={{
@@ -279,6 +291,17 @@ export default function TemplateManager() {
                   Delete
                 </button>
               </div>
+              {previewId === t._id && (
+                <div className="fade-in">
+                  <div 
+                    className="template-preview-box"
+                    dangerouslySetInnerHTML={{ __html: t.htmlBody }}
+                  />
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'right' }}>
+                    * Placeholders like <code>{'{'}name{'}'}</code> will be replaced during sending.
+                  </div>
+                </div>
+              )}
             </div>
           ))}
           {templates.length === 0 && (
