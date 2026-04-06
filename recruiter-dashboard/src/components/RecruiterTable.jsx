@@ -75,6 +75,7 @@ export default function RecruiterTable() {
             <tr>
               <th>Email</th>
               <th>Company</th>
+              <th>Thread</th>
               <th>Status</th>
               <th>Reply Date</th>
               <th>Reply Snippet</th>
@@ -89,7 +90,7 @@ export default function RecruiterTable() {
             {filteredData.length === 0 ? (
               <tr>
                 <td
-                  colSpan="10"
+                  colSpan="11"
                   style={{
                     textAlign: "center",
                     padding: "32px",
@@ -125,6 +126,26 @@ export default function RecruiterTable() {
                         <span style={{ fontSize: "10px", padding: "2px 6px", background: "#dcfce7", color: "#166534", borderRadius: "10px", fontWeight: 600 }}>✨ AI Sent</span>
                       )}
                     </div>
+                  </td>
+                  <td>
+                    {r.messageId ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <code style={{ fontSize: '10px', opacity: 0.7 }}>{r.messageId.split('@')[0].slice(0, 12)}...</code>
+                        {r.tags && r.tags.includes("same thread") && (
+                          <span style={{ 
+                            fontSize: "10px", 
+                            padding: "2px 6px", 
+                            background: "#fef3c7", 
+                            color: "#92400e", 
+                            borderRadius: "10px", 
+                            fontWeight: 600,
+                            width: 'fit-content'
+                          }}>
+                            🧵 Same Thread
+                          </span>
+                        )}
+                      </div>
+                    ) : "-"}
                   </td>
                   <td>
                     <span className={`badge ${r.status} ${r.is_fake ? 'fake' : r.is_risky ? 'risky' : ''}`}>
