@@ -9,6 +9,7 @@ export default function CsvUpload() {
   const [companyName, setCompanyName] = useState("");
   const [companyType, setCompanyType] = useState("startup");
   const [limit, setLimit] = useState(30);
+  const [agentLogs, setAgentLogs] = useState([]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -47,28 +48,50 @@ export default function CsvUpload() {
     }
   };
 
-  const handleAgentFind = async () => {
+  const handleAgentFind = () => {
     if (!companyName.trim()) return;
     setLoading(true);
     setMessage("");
-    try {
-      const res = await fetch(`${API_BASE}/recruiters/agent-find`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company: companyName, companyType, limit: parseInt(limit) })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`🤖 Success! Found and verified ${data.count_added} recruiters (skipped ${data.skipped} duplicates) at ${data.company}!`);
-        setCompanyName("");
-      } else {
-        setMessage(`🤖 Agent Error: ${data.detail || "Failed to locate recruiters"}`);
+    setAgentLogs(["🤖 Starting AI Lead Agent..."]);
+
+    const queryParams = new URLSearchParams({
+      company: companyName,
+      companyType: companyType,
+      limit: limit.toString()
+    });
+
+    const eventSource = new EventSource(`${API_BASE}/recruiters/agent-find/stream?${queryParams.toString()}`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const step = JSON.parse(event.data);
+        if (step.type === "log") {
+          setAgentLogs((prev) => [...prev, step.message]);
+        } else if (step.type === "error") {
+          setAgentLogs((prev) => [...prev, `❌ Error: ${step.message}`]);
+          setMessage(`🤖 Agent Error: ${step.message}`);
+          setLoading(false);
+          eventSource.close();
+        } else if (step.type === "complete") {
+          const data = step.data;
+          setAgentLogs((prev) => [...prev, `🏁 Complete! Added ${data.count_added} recruiters.`]);
+          setMessage(`🤖 Success! Found and verified ${data.count_added} recruiters (skipped ${data.skipped} duplicates) at ${data.company}!`);
+          setCompanyName("");
+          setLoading(false);
+          eventSource.close();
+        }
+      } catch (err) {
+        setAgentLogs((prev) => [...prev, `❌ Stream Error: ${err.message}`]);
+        setLoading(false);
+        eventSource.close();
       }
-    } catch (err) {
-      setMessage(`🤖 Agent Failed: ${err.message}`);
-    } finally {
+    };
+
+    eventSource.onerror = (err) => {
+      // EventSource triggers onerror when the connection closes cleanly, which is normal for finished stream
       setLoading(false);
-    }
+      eventSource.close();
+    };
   };
 
   const handleTextImport = async () => {
@@ -242,6 +265,30 @@ export default function CsvUpload() {
             {loading ? "Agent Working..." : "Find & Import"}
           </button>
         </div>
+
+        {agentLogs.length > 0 && (
+          <div 
+            style={{
+              marginTop: "16px",
+              background: "#0c0f17",
+              color: "#e2e8f0",
+              fontFamily: "monospace",
+              fontSize: "12px",
+              padding: "12px",
+              borderRadius: "8px",
+              maxHeight: "150px",
+              overflowY: "auto",
+              border: "1px solid #1e293b",
+              whiteSpace: "pre-wrap"
+            }}
+          >
+            {agentLogs.map((log, idx) => (
+              <div key={idx} style={{ marginBottom: "2px" }}>
+                {log}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {message && (
