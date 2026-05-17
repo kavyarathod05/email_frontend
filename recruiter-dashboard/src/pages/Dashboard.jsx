@@ -6,6 +6,7 @@ import TestPanel from "../components/TestPanel";
 import TemplateManager from "../components/TemplateManager";
 import AnalyticsCharts from "../components/AnalyticsCharts";
 import DailyReport from "../components/DailyReport";
+import QueuePanel from "../components/QueuePanel";
 import "../style.css";
 
 export default function Dashboard() {
@@ -22,6 +23,12 @@ export default function Dashboard() {
       </div>
 
       <div className="tabs">
+        <button
+          className={`tab-btn ${activeTab === "queue" ? "active" : ""}`}
+          onClick={() => setActiveTab("queue")}
+        >
+          Queue
+        </button>
         <button
           className={`tab-btn ${activeTab === "overview" ? "active" : ""}`}
           onClick={() => setActiveTab("overview")}
@@ -67,6 +74,12 @@ export default function Dashboard() {
       </div>
 
       <div className="tab-content">
+        {activeTab === "queue" && (
+          <div className="fade-in">
+            <QueuePanel />
+          </div>
+        )}
+
         {activeTab === "overview" && (
           <div className="fade-in">
             <Stats />
