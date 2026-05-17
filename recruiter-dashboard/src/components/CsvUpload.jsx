@@ -8,6 +8,7 @@ export default function CsvUpload() {
   const [loading, setLoading] = useState(false);
   const [companyName, setCompanyName] = useState("");
   const [companyType, setCompanyType] = useState("startup");
+  const [limit, setLimit] = useState(30);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -54,14 +55,14 @@ export default function CsvUpload() {
       const res = await fetch(`${API_BASE}/recruiters/agent-find`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company: companyName, companyType })
+        body: JSON.stringify({ company: companyName, companyType, limit: parseInt(limit) })
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage(`🤖 Success! Found and verified recruiter "${data.name}" (${data.email}) at ${data.company}. Added to database!`);
+        setMessage(`🤖 Success! Found and verified ${data.count_added} recruiters (skipped ${data.skipped} duplicates) at ${data.company}!`);
         setCompanyName("");
       } else {
-        setMessage(`🤖 Agent Error: ${data.detail || "Failed to locate recruiter"}`);
+        setMessage(`🤖 Agent Error: ${data.detail || "Failed to locate recruiters"}`);
       }
     } catch (err) {
       setMessage(`🤖 Agent Failed: ${err.message}`);
@@ -179,7 +180,7 @@ export default function CsvUpload() {
         <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "16px" }}>
           Provide a company name. The agent will scrape LinkedIn profiles via search engines, extract the recruiter name using Gemini, guess their emails, verify them via MX / SMTP handshake (with catch-all filtering), and automatically inject the contact into your outreach queue.
         </p>
-        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
           <input 
             type="text" 
             placeholder="Enter Company Name (e.g. Stripe, Linear)" 
@@ -190,11 +191,32 @@ export default function CsvUpload() {
               borderRadius: "8px",
               border: "1px solid var(--border)",
               flex: 1,
+              minWidth: "200px",
               fontSize: "14px",
               background: "var(--card-bg)",
               color: "inherit"
             }}
           />
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Limit:</span>
+            <input 
+              type="number" 
+              min="1" 
+              max="100" 
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+              style={{
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+                width: "70px",
+                fontSize: "14px",
+                background: "var(--card-bg)",
+                color: "inherit",
+                textAlign: "center"
+              }}
+            />
+          </div>
           <select 
             value={companyType} 
             onChange={(e) => setCompanyType(e.target.value)}
