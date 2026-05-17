@@ -6,6 +6,13 @@ export default function CsvUpload() {
   const [csvText, setCsvText] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [companyType, setCompanyType] = useState("startup");
+  const [limit, setLimit] = useState(30);
+  const [agentLogs, setAgentLogs] = useState([]);
+  const [batchLogs, setBatchLogs] = useState([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchLimit, setBatchLimit] = useState(4);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -34,7 +41,6 @@ export default function CsvUpload() {
       if (res.ok) {
         setMessage(`Success: ${data.added} added, ${data.skipped} skipped.`);
         setFile(null);
-        // Clear file input if possible
       } else {
         setMessage(`Error: ${data.detail || "Failed to upload"}`);
       }
@@ -43,6 +49,89 @@ export default function CsvUpload() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAgentFind = () => {
+    if (!companyName.trim()) return;
+    setLoading(true);
+    setMessage("");
+    setAgentLogs(["🤖 Starting AI Lead Agent..."]);
+
+    const queryParams = new URLSearchParams({
+      company: companyName,
+      companyType: companyType,
+      limit: limit.toString()
+    });
+
+    const eventSource = new EventSource(`${API_BASE}/recruiters/agent-find/stream?${queryParams.toString()}`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const step = JSON.parse(event.data);
+        if (step.type === "log") {
+          setAgentLogs((prev) => [...prev, step.message]);
+        } else if (step.type === "error") {
+          setAgentLogs((prev) => [...prev, `❌ Error: ${step.message}`]);
+          setMessage(`🤖 Agent Error: ${step.message}`);
+          setLoading(false);
+          eventSource.close();
+        } else if (step.type === "complete") {
+          const data = step.data;
+          setAgentLogs((prev) => [...prev, `🏁 Complete! Added ${data.count_added} recruiters.`]);
+          setMessage(`🤖 Success! Found and verified ${data.count_added} recruiters (skipped ${data.skipped} duplicates) at ${data.company}!`);
+          setCompanyName("");
+          setLoading(false);
+          eventSource.close();
+        }
+      } catch (err) {
+        setAgentLogs((prev) => [...prev, `❌ Stream Error: ${err.message}`]);
+        setLoading(false);
+        eventSource.close();
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      // EventSource triggers onerror when the connection closes cleanly, which is normal for finished stream
+      setLoading(false);
+      eventSource.close();
+    };
+  };
+
+  const handleBatchHarvest = () => {
+    setBatchLoading(true);
+    setMessage("");
+    setBatchLogs(["🚀 Connecting to Batch Harvester Stream..."]);
+
+    const eventSource = new EventSource(`${API_BASE}/recruiters/batch-harvest/stream?limit=${batchLimit}`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const step = JSON.parse(event.data);
+        if (step.type === "log") {
+          setBatchLogs((prev) => [...prev, step.message]);
+        } else if (step.type === "error") {
+          setBatchLogs((prev) => [...prev, `❌ Error: ${step.message}`]);
+          setMessage(`📦 Batch Error: ${step.message}`);
+          setBatchLoading(false);
+          eventSource.close();
+        } else if (step.type === "complete") {
+          const data = step.data;
+          setBatchLogs((prev) => [...prev, `🏁 Batch Import Completed! Total recruiters added: ${data.count_added}`]);
+          setMessage(`📦 Success! Completed batch import of 5 companies, successfully adding ${data.count_added} recruiters!`);
+          setBatchLoading(false);
+          eventSource.close();
+        }
+      } catch (err) {
+        setBatchLogs((prev) => [...prev, `❌ Stream Error: ${err.message}`]);
+        setBatchLoading(false);
+        eventSource.close();
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      setBatchLoading(false);
+      eventSource.close();
+    };
   };
 
   const handleTextImport = async () => {
@@ -147,6 +236,160 @@ export default function CsvUpload() {
             {loading ? "Importing..." : "Import from Text"}
           </button>
         </div>
+      </div>
+
+      <div className="card" style={{ gridColumn: "1 / -1", marginTop: "12px" }}>
+        <h3 style={{ marginTop: 0, marginBottom: "8px" }}>🤖 Free AI Lead Agent</h3>
+        <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "16px" }}>
+          Provide a company name. The agent will scrape LinkedIn profiles via search engines, extract the recruiter name using Gemini, guess their emails, verify them via MX / SMTP handshake (with catch-all filtering), and automatically inject the contact into your outreach queue.
+        </p>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+          <input 
+            type="text" 
+            placeholder="Enter Company Name (e.g. Stripe, Linear)" 
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: "8px",
+              border: "1px solid var(--border)",
+              flex: 1,
+              minWidth: "200px",
+              fontSize: "14px",
+              background: "var(--card-bg)",
+              color: "inherit"
+            }}
+          />
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Limit:</span>
+            <input 
+              type="number" 
+              min="1" 
+              max="100" 
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+              style={{
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+                width: "70px",
+                fontSize: "14px",
+                background: "var(--card-bg)",
+                color: "inherit",
+                textAlign: "center"
+              }}
+            />
+          </div>
+          <select 
+            value={companyType} 
+            onChange={(e) => setCompanyType(e.target.value)}
+            style={{
+              padding: "10px",
+              borderRadius: "8px",
+              border: "1px solid var(--border)",
+              fontSize: "14px",
+              cursor: "pointer",
+              background: "var(--card-bg)",
+              color: "inherit"
+            }}
+          >
+            <option value="startup">Startup</option>
+            <option value="top_tier">Top Tier</option>
+          </select>
+          <button
+            className="primary-btn"
+            onClick={handleAgentFind}
+            disabled={loading || !companyName.trim()}
+            style={{ margin: 0 }}
+          >
+            {loading ? "Agent Working..." : "Find & Import"}
+          </button>
+        </div>
+
+        {agentLogs.length > 0 && (
+          <div 
+            style={{
+              marginTop: "16px",
+              background: "#0c0f17",
+              color: "#e2e8f0",
+              fontFamily: "monospace",
+              fontSize: "12px",
+              padding: "12px",
+              borderRadius: "8px",
+              maxHeight: "150px",
+              overflowY: "auto",
+              border: "1px solid #1e293b",
+              whiteSpace: "pre-wrap"
+            }}
+          >
+            {agentLogs.map((log, idx) => (
+              <div key={idx} style={{ marginBottom: "2px" }}>
+                {log}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ gridColumn: "1 / -1", marginTop: "12px" }}>
+        <h3 style={{ marginTop: 0, marginBottom: "8px" }}>📦 Automated Batch Harvester (5 Companies)</h3>
+        <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "16px" }}>
+          Trigger an automated pipeline run that reads your <code>top_tier_companies.txt</code> list, finds the first 5 companies that have not been imported yet, and harvests their recruiters. In compliance with your preferences, all SMTP checks are completely disabled, queries are spaced out naturally with delays, and it imports exactly 3–4 recruiters per company.
+        </p>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Recruiters Per Company:</span>
+            <input 
+              type="number" 
+              min="1" 
+              max="10" 
+              value={batchLimit}
+              onChange={(e) => setBatchLimit(parseInt(e.target.value))}
+              style={{
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+                width: "70px",
+                fontSize: "14px",
+                background: "var(--card-bg)",
+                color: "inherit",
+                textAlign: "center"
+              }}
+            />
+          </div>
+          <button
+            className="primary-btn"
+            onClick={handleBatchHarvest}
+            disabled={batchLoading}
+            style={{ margin: 0, background: "#7c3aed", borderColor: "#7c3aed" }}
+          >
+            {batchLoading ? "Harvester Running..." : "🚀 Launch Batch Import"}
+          </button>
+        </div>
+
+        {batchLogs.length > 0 && (
+          <div 
+            style={{
+              marginTop: "16px",
+              background: "#0a0f1d",
+              color: "#a7f3d0",
+              fontFamily: "monospace",
+              fontSize: "12px",
+              padding: "12px",
+              borderRadius: "8px",
+              maxHeight: "180px",
+              overflowY: "auto",
+              border: "1px solid #1e293b",
+              whiteSpace: "pre-wrap"
+            }}
+          >
+            {batchLogs.map((log, idx) => (
+              <div key={idx} style={{ marginBottom: "2px" }}>
+                {log}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {message && (
