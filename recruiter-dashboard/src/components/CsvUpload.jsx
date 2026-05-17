@@ -10,6 +10,9 @@ export default function CsvUpload() {
   const [companyType, setCompanyType] = useState("startup");
   const [limit, setLimit] = useState(30);
   const [agentLogs, setAgentLogs] = useState([]);
+  const [batchLogs, setBatchLogs] = useState([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchLimit, setBatchLimit] = useState(4);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -90,6 +93,43 @@ export default function CsvUpload() {
     eventSource.onerror = (err) => {
       // EventSource triggers onerror when the connection closes cleanly, which is normal for finished stream
       setLoading(false);
+      eventSource.close();
+    };
+  };
+
+  const handleBatchHarvest = () => {
+    setBatchLoading(true);
+    setMessage("");
+    setBatchLogs(["🚀 Connecting to Batch Harvester Stream..."]);
+
+    const eventSource = new EventSource(`${API_BASE}/recruiters/batch-harvest/stream?limit=${batchLimit}`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const step = JSON.parse(event.data);
+        if (step.type === "log") {
+          setBatchLogs((prev) => [...prev, step.message]);
+        } else if (step.type === "error") {
+          setBatchLogs((prev) => [...prev, `❌ Error: ${step.message}`]);
+          setMessage(`📦 Batch Error: ${step.message}`);
+          setBatchLoading(false);
+          eventSource.close();
+        } else if (step.type === "complete") {
+          const data = step.data;
+          setBatchLogs((prev) => [...prev, `🏁 Batch Import Completed! Total recruiters added: ${data.count_added}`]);
+          setMessage(`📦 Success! Completed batch import of 5 companies, successfully adding ${data.count_added} recruiters!`);
+          setBatchLoading(false);
+          eventSource.close();
+        }
+      } catch (err) {
+        setBatchLogs((prev) => [...prev, `❌ Stream Error: ${err.message}`]);
+        setBatchLoading(false);
+        eventSource.close();
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      setBatchLoading(false);
       eventSource.close();
     };
   };
@@ -283,6 +323,67 @@ export default function CsvUpload() {
             }}
           >
             {agentLogs.map((log, idx) => (
+              <div key={idx} style={{ marginBottom: "2px" }}>
+                {log}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ gridColumn: "1 / -1", marginTop: "12px" }}>
+        <h3 style={{ marginTop: 0, marginBottom: "8px" }}>📦 Automated Batch Harvester (5 Companies)</h3>
+        <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "16px" }}>
+          Trigger an automated pipeline run that reads your <code>top_tier_companies.txt</code> list, finds the first 5 companies that have not been imported yet, and harvests their recruiters. In compliance with your preferences, all SMTP checks are completely disabled, queries are spaced out naturally with delays, and it imports exactly 3–4 recruiters per company.
+        </p>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Recruiters Per Company:</span>
+            <input 
+              type="number" 
+              min="1" 
+              max="10" 
+              value={batchLimit}
+              onChange={(e) => setBatchLimit(parseInt(e.target.value))}
+              style={{
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+                width: "70px",
+                fontSize: "14px",
+                background: "var(--card-bg)",
+                color: "inherit",
+                textAlign: "center"
+              }}
+            />
+          </div>
+          <button
+            className="primary-btn"
+            onClick={handleBatchHarvest}
+            disabled={batchLoading}
+            style={{ margin: 0, background: "#7c3aed", borderColor: "#7c3aed" }}
+          >
+            {batchLoading ? "Harvester Running..." : "🚀 Launch Batch Import"}
+          </button>
+        </div>
+
+        {batchLogs.length > 0 && (
+          <div 
+            style={{
+              marginTop: "16px",
+              background: "#0a0f1d",
+              color: "#a7f3d0",
+              fontFamily: "monospace",
+              fontSize: "12px",
+              padding: "12px",
+              borderRadius: "8px",
+              maxHeight: "180px",
+              overflowY: "auto",
+              border: "1px solid #1e293b",
+              whiteSpace: "pre-wrap"
+            }}
+          >
+            {batchLogs.map((log, idx) => (
               <div key={idx} style={{ marginBottom: "2px" }}>
                 {log}
               </div>
