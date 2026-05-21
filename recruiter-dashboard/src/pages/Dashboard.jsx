@@ -8,6 +8,7 @@ import AnalyticsCharts from "../components/AnalyticsCharts";
 import DailyReport from "../components/DailyReport";
 import QueuePanel from "../components/QueuePanel";
 import LogPanel from "../components/LogPanel";
+import GeneratedEmailsPanel from "../components/GeneratedEmailsPanel";
 import "../style.css";
 
 export default function Dashboard() {
@@ -35,6 +36,12 @@ export default function Dashboard() {
           onClick={() => setActiveTab("queue")}
         >
           Queue
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "generatedEmails" ? "active" : ""}`}
+          onClick={() => setActiveTab("generatedEmails")}
+        >
+          Generated Emails
         </button>
         <button
           className={`tab-btn ${activeTab === "overview" ? "active" : ""}`}
@@ -90,6 +97,12 @@ export default function Dashboard() {
         {activeTab === "queue" && (
           <div className="fade-in">
             <QueuePanel />
+          </div>
+        )}
+
+        {activeTab === "generatedEmails" && (
+          <div className="fade-in">
+            <GeneratedEmailsPanel />
           </div>
         )}
 
