@@ -9,22 +9,33 @@ import DailyReport from "../components/DailyReport";
 import QueuePanel from "../components/QueuePanel";
 import LogPanel from "../components/LogPanel";
 import GeneratedEmailsPanel from "../components/GeneratedEmailsPanel";
+import InternshipLinks from "../components/InternshipLinks";
+import InternshipOps from "../components/InternshipOps";
 import "../style.css";
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("internships");
 
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h1>Recruiter Outreach Dashboard</h1>
-        <p>
-          Manage your email campaigns, track opens and clicks, and automate
-          follow-ups.
-        </p>
+        <p>Internship links + email campaigns — one backend.</p>
       </div>
 
       <div className="tabs">
+        <button
+          className={`tab-btn ${activeTab === "internships" ? "active" : ""}`}
+          onClick={() => setActiveTab("internships")}
+        >
+          Internship Links
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "internshipOps" ? "active" : ""}`}
+          onClick={() => setActiveTab("internshipOps")}
+        >
+          Companies & Crawlers
+        </button>
         <button
           className={`tab-btn ${activeTab === "logs" ? "active" : ""}`}
           onClick={() => setActiveTab("logs")}
@@ -88,60 +99,61 @@ export default function Dashboard() {
       </div>
 
       <div className="tab-content">
+        {activeTab === "internships" && (
+          <div className="fade-in">
+            <InternshipLinks />
+          </div>
+        )}
+        {activeTab === "internshipOps" && (
+          <div className="fade-in">
+            <InternshipOps />
+          </div>
+        )}
         {activeTab === "logs" && (
           <div className="fade-in">
             <LogPanel />
           </div>
         )}
-
         {activeTab === "queue" && (
           <div className="fade-in">
             <QueuePanel />
           </div>
         )}
-
         {activeTab === "generatedEmails" && (
           <div className="fade-in">
             <GeneratedEmailsPanel />
           </div>
         )}
-
         {activeTab === "overview" && (
           <div className="fade-in">
             <Stats />
           </div>
         )}
-
         {activeTab === "analytics" && (
           <div className="fade-in">
             <AnalyticsCharts />
           </div>
         )}
-
         {activeTab === "dailyReport" && (
           <div className="fade-in">
             <DailyReport />
           </div>
         )}
-
         {activeTab === "templates" && (
           <div className="fade-in">
             <TemplateManager />
           </div>
         )}
-
         {activeTab === "recruiters" && (
           <div className="fade-in">
             <RecruiterTable />
           </div>
         )}
-
         {activeTab === "actions" && (
           <div className="fade-in">
             <CsvUpload />
           </div>
         )}
-
         {activeTab === "testing" && (
           <div className="fade-in">
             <TestPanel />
