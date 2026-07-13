@@ -98,7 +98,7 @@ export default function InternshipLinks() {
       if (secret) headers["X-Scheduler-Secret"] = secret;
 
       // Prefer full tick; fall back to crawl-only if secret blocks tick
-      let res = await fetch(`${INTEL_API_BASE}/api/v1/crawlers/run`, {
+      let res = await fetch(`${INTEL_API_BASE}/api/v1/crawlers/run?limit=25`, {
         method: "POST",
         headers,
       });
@@ -107,8 +107,9 @@ export default function InternshipLinks() {
 
       setCrawlLogs(data.company_logs || []);
       setTickMsg(
-        `Done: ${data.companies_ok}/${data.companies_attempted} boards OK · ` +
-          `${data.jobs_passed_filter} internships matched · ${data.jobs_new} new`
+        `Batch done: ${data.companies_ok}/${data.companies_attempted} boards OK · ` +
+          `${data.jobs_passed_filter} internships matched · ${data.jobs_new} new. ` +
+          `Click Run crawl again for the next batch of companies.`
       );
       await loadRuns();
       await loadJobs();
