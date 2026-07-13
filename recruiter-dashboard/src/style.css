@@ -25,9 +25,10 @@ h1, h2, h3, h4 {
 }
 
 .dashboard-container {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 24px 16px 48px;
+  overflow-x: hidden;
 }
 
 .dashboard-header {
@@ -253,27 +254,204 @@ tbody tr:hover {
 .badge.risky { background: #fef9c3; color: #854d0e; border: 1px solid #facc15; }
 .badge.skipped_fake { background: #f1f5f9; color: #475569; text-decoration: line-through; }
 
-/* Tabs Navigation */
+/* Tabs Navigation — wrap so UI doesn't break with many tabs */
 .tabs {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 24px;
   border-bottom: 2px solid var(--border);
-  padding-bottom: 16px;
+  padding-bottom: 12px;
 }
 
 .tab-btn {
   background: transparent;
   border: none;
-  padding: 10px 20px;
+  padding: 8px 14px;
   font-family: inherit;
   font-weight: 500;
-  font-size: 15px;
+  font-size: 13px;
   color: var(--text-muted);
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
+
+.dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  overflow-x: hidden;
+}
+
+/* Internship intel layout */
+.intel-layout {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .intel-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.intel-panel {
+  min-width: 0;
+}
+
+.intel-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  align-items: flex-start;
+}
+
+.intel-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.intel-sub {
+  color: var(--text-muted);
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.intel-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 14px;
+}
+
+.intel-search {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  min-width: 160px;
+  font-family: inherit;
+}
+
+.intel-count {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.intel-msg {
+  font-size: 13px;
+  color: #0f766e;
+  margin: 0 0 12px;
+}
+
+.intel-msg.err {
+  color: #b91c1c;
+}
+
+.btn-muted {
+  background: #334155 !important;
+}
+
+.btn-teal {
+  background: #0f766e !important;
+}
+
+.intel-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.intel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.intel-table th,
+.intel-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cell-strong {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.tag-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tag-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.intel-log-panel {
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.intel-log-scroll {
+  overflow-y: auto;
+  max-height: 70vh;
+  padding-right: 4px;
+}
+
+.crawl-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #f8fafc;
+}
+
+.crawl-row.status-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.crawl-row.status-ok {
+  border-color: #bbf7d0;
+}
+
+.crawl-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.crawl-sample {
+  font-size: 12px;
+  padding-left: 4px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badge.crawl-ok { background: #dcfce7; color: #166534; }
+.badge.crawl-error { background: #fee2e2; color: #b91c1c; }
+.badge.crawl-skipped { background: #f1f5f9; color: #475569; }
+.badge.crawl-pending { background: #e0f2fe; color: #0369a1; }
 
 .tab-btn:hover {
   background: #f1f5f9;
