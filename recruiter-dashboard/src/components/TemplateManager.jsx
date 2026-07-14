@@ -140,6 +140,7 @@ export default function TemplateManager() {
               <option value="initial">Initial Email</option>
               <option value="followup1">Follow-up 1</option>
               <option value="breakup">Breakup</option>
+              <option value="referral">Referral request</option>
             </select>
           </div>
           <div>
@@ -152,7 +153,7 @@ export default function TemplateManager() {
                 color: "var(--text-muted)",
               }}
             >
-              Subject (use {"{company}"} for dynamic company name)
+              Subject (use {"{company}"}, {"{job_title}"} for referrals)
             </label>
             <input
               required
@@ -178,8 +179,8 @@ export default function TemplateManager() {
                 color: "var(--text-muted)",
               }}
             >
-              HTML Body (use {"{name}"}, {"{company}"}, {"{resume_link}"} for
-              link, {"{resume_url}"} for raw URL)
+              HTML Body — outreach: {"{name}"}, {"{company}"}, {"{resume_link}"}. Referral
+              also supports {"{job_title}"}, {"{job_link}"}, {"{job_url}"}, {"{resume_url}"}.
             </label>
             <textarea
               required

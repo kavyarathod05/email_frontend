@@ -1,18 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { INTEL_API_BASE } from "../config";
+import ReferralPanel from "./ReferralPanel";
+
+function formatPosted(job) {
+  const raw = job.posted_at || job.first_seen_at;
+  if (!raw) return "—";
+  try {
+    const d = new Date(raw);
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+}
 
 export default function InternshipLinks() {
   const [jobs, setJobs] = useState([]);
+  const [applications, setApplications] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [newToday, setNewToday] = useState(false);
   const [company, setCompany] = useState("");
+  const [showTracked, setShowTracked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [tickMsg, setTickMsg] = useState("");
   const [crawlLogs, setCrawlLogs] = useState([]);
   const [crawlStatus, setCrawlStatus] = useState("");
   const [crawlProgress, setCrawlProgress] = useState(null);
+  const [referralJob, setReferralJob] = useState(null);
   const pollRef = useRef(null);
 
   const loadJobs = useCallback(async () => {
@@ -23,10 +42,13 @@ export default function InternshipLinks() {
         limit: "100",
         filter_pass: "true",
         status: "open",
+        exclude_tracked: "true",
       });
       if (newToday) qs.set("new_today", "true");
       if (company.trim()) qs.set("company", company.trim());
-      const path = newToday ? `/api/v1/jobs/today?limit=100` : `/api/v1/jobs?${qs}`;
+      const path = newToday
+        ? `/api/v1/jobs/today?limit=100`
+        : `/api/v1/jobs?${qs}`;
       const res = await fetch(`${INTEL_API_BASE}${path}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -39,6 +61,17 @@ export default function InternshipLinks() {
       setLoading(false);
     }
   }, [newToday, company]);
+
+  const loadApplications = useCallback(async () => {
+    try {
+      const res = await fetch(`${INTEL_API_BASE}/api/v1/jobs/applications?limit=200`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setApplications(data.items || []);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const loadRuns = useCallback(async () => {
     try {
@@ -57,14 +90,33 @@ export default function InternshipLinks() {
 
   useEffect(() => {
     loadJobs();
+    loadApplications();
     loadRuns();
-  }, [loadJobs, loadRuns]);
+  }, [loadJobs, loadApplications, loadRuns]);
 
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
+
+  const markApplied = async (job, tracked) => {
+    try {
+      const res = await fetch(`${INTEL_API_BASE}/api/v1/jobs/${job.id}/track`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tracked }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || `HTTP ${res.status}`);
+      }
+      await loadJobs();
+      await loadApplications();
+    } catch (e) {
+      alert(`Could not update: ${e.message}`);
+    }
+  };
 
   const seedCompanies = async () => {
     setBusy(true);
@@ -97,7 +149,6 @@ export default function InternshipLinks() {
       const headers = { "Content-Type": "application/json" };
       if (secret) headers["X-Scheduler-Secret"] = secret;
 
-      // Prefer full tick; fall back to crawl-only if secret blocks tick
       let res = await fetch(`${INTEL_API_BASE}/api/v1/crawlers/run?limit=25`, {
         method: "POST",
         headers,
@@ -145,25 +196,23 @@ export default function InternshipLinks() {
             <button className="primary-btn" onClick={runCrawl} disabled={busy}>
               {busy ? "Crawling…" : "Run crawl"}
             </button>
-            <button
-              className="primary-btn btn-muted"
-              onClick={loadJobs}
-              disabled={loading}
-            >
+            <button className="primary-btn btn-muted" onClick={loadJobs} disabled={loading}>
               Refresh
             </button>
-            <button
-              className="primary-btn btn-teal"
-              onClick={copyLinks}
-              disabled={!jobs.length}
-            >
+            <button className="primary-btn btn-teal" onClick={copyLinks} disabled={!jobs.length}>
               Copy links
             </button>
           </div>
         </div>
 
         {tickMsg && (
-          <p className={tickMsg.includes("error") || tickMsg.includes("Error") ? "intel-msg err" : "intel-msg"}>
+          <p
+            className={
+              tickMsg.includes("error") || tickMsg.includes("Error")
+                ? "intel-msg err"
+                : "intel-msg"
+            }
+          >
             {tickMsg}
           </p>
         )}
@@ -177,6 +226,14 @@ export default function InternshipLinks() {
             />
             New today only
           </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={showTracked}
+              onChange={(e) => setShowTracked(e.target.checked)}
+            />
+            My applications ({applications.length})
+          </label>
           <input
             className="intel-search"
             placeholder="Filter company…"
@@ -185,6 +242,64 @@ export default function InternshipLinks() {
           />
           <span className="intel-count">{total} openings</span>
         </div>
+
+        {showTracked && (
+          <div className="intel-apps-section">
+            <h3 style={{ margin: "0 0 8px" }}>Saved applications</h3>
+            <p className="intel-sub">
+              Checked jobs are saved here and hidden from the main list. Uncheck to show again.
+            </p>
+            {applications.length === 0 ? (
+              <p className="intel-sub">No applications tracked yet.</p>
+            ) : (
+              <div className="intel-table-wrap">
+                <table className="intel-table">
+                  <thead>
+                    <tr>
+                      <th>Applied</th>
+                      <th>Posted</th>
+                      <th>Company</th>
+                      <th>Title</th>
+                      <th>Link</th>
+                      <th>Referral</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {applications.map((j) => (
+                      <tr key={j.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked
+                            title="Uncheck to restore to feed"
+                            onChange={() => markApplied(j, false)}
+                          />
+                        </td>
+                        <td className="cell-muted">{formatPosted(j)}</td>
+                        <td className="cell-strong">{j.company_name}</td>
+                        <td>{j.title}</td>
+                        <td>
+                          <a href={j.apply_url} target="_blank" rel="noreferrer">
+                            Open →
+                          </a>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="link-btn"
+                            onClick={() => setReferralJob(j)}
+                          >
+                            Find &amp; refer
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {loading && <p>Loading…</p>}
         {error && <p className="intel-msg err">{error}</p>}
@@ -199,16 +314,28 @@ export default function InternshipLinks() {
             <table className="intel-table">
               <thead>
                 <tr>
+                  <th title="Mark applied — hides from list">Applied</th>
+                  <th>Posted</th>
                   <th>Company</th>
                   <th>Title</th>
                   <th>Location</th>
                   <th>Tags</th>
                   <th>Apply</th>
+                  <th>Referral</th>
                 </tr>
               </thead>
               <tbody>
                 {jobs.map((j) => (
                   <tr key={j.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={false}
+                        title="Mark as applied (saves link, hides from feed)"
+                        onChange={() => markApplied(j, true)}
+                      />
+                    </td>
+                    <td className="cell-muted">{formatPosted(j)}</td>
                     <td className="cell-strong">{j.company_name}</td>
                     <td>{j.title}</td>
                     <td>{j.location_text || (j.is_remote ? "Remote" : "—")}</td>
@@ -219,6 +346,15 @@ export default function InternshipLinks() {
                       <a href={j.apply_url} target="_blank" rel="noreferrer">
                         Open →
                       </a>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => setReferralJob(j)}
+                      >
+                        Find &amp; refer
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -274,6 +410,10 @@ export default function InternshipLinks() {
           ))}
         </div>
       </div>
+
+      {referralJob && (
+        <ReferralPanel job={referralJob} onClose={() => setReferralJob(null)} />
+      )}
     </div>
   );
 }
