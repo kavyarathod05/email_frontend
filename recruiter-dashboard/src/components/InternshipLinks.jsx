@@ -2,6 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { INTEL_API_BASE } from "../config";
 import ReferralPanel from "./ReferralPanel";
 
+const FILTER_DEFAULTS = {
+  indiaOnly: true,
+  allowRemote: false,
+  internOnly: true,
+  techOnly: true,
+};
+
 function formatPosted(job) {
   const raw = job.posted_at || job.first_seen_at;
   if (!raw) return "—";
@@ -17,6 +24,16 @@ function formatPosted(job) {
   }
 }
 
+function loadSavedFilters() {
+  try {
+    const raw = localStorage.getItem("intel_job_filters");
+    if (!raw) return { ...FILTER_DEFAULTS };
+    return { ...FILTER_DEFAULTS, ...JSON.parse(raw) };
+  } catch {
+    return { ...FILTER_DEFAULTS };
+  }
+}
+
 export default function InternshipLinks() {
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -26,6 +43,7 @@ export default function InternshipLinks() {
   const [newToday, setNewToday] = useState(false);
   const [company, setCompany] = useState("");
   const [showTracked, setShowTracked] = useState(false);
+  const [filters, setFilters] = useState(loadSavedFilters);
   const [busy, setBusy] = useState(false);
   const [tickMsg, setTickMsg] = useState("");
   const [crawlLogs, setCrawlLogs] = useState([]);
@@ -33,6 +51,14 @@ export default function InternshipLinks() {
   const [crawlProgress, setCrawlProgress] = useState(null);
   const [referralJob, setReferralJob] = useState(null);
   const pollRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem("intel_job_filters", JSON.stringify(filters));
+  }, [filters]);
+
+  const setFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
 
   const loadJobs = useCallback(async () => {
     setLoading(true);
@@ -43,11 +69,15 @@ export default function InternshipLinks() {
         filter_pass: "true",
         status: "open",
         exclude_tracked: "true",
+        india_only: String(filters.indiaOnly),
+        allow_remote: String(filters.allowRemote),
+        intern_only: String(filters.internOnly),
+        tech_only: String(filters.techOnly),
       });
       if (newToday) qs.set("new_today", "true");
       if (company.trim()) qs.set("company", company.trim());
       const path = newToday
-        ? `/api/v1/jobs/today?limit=100`
+        ? `/api/v1/jobs/today?${qs}`
         : `/api/v1/jobs?${qs}`;
       const res = await fetch(`${INTEL_API_BASE}${path}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -60,7 +90,7 @@ export default function InternshipLinks() {
     } finally {
       setLoading(false);
     }
-  }, [newToday, company]);
+  }, [newToday, company, filters]);
 
   const loadApplications = useCallback(async () => {
     try {
@@ -83,8 +113,9 @@ export default function InternshipLinks() {
       setCrawlStatus(run.status || "");
       setCrawlProgress(run.progress || run.result || null);
       setCrawlLogs(run.company_logs || []);
+      return run;
     } catch {
-      /* ignore */
+      return null;
     }
   }, []);
 
@@ -137,39 +168,52 @@ export default function InternshipLinks() {
 
   const runCrawl = async () => {
     setBusy(true);
-    setTickMsg("Crawl started — watching company logs…");
+    setTickMsg("Starting full crawl of all companies (batched + concurrent)…");
     setCrawlLogs([]);
     setCrawlStatus("running");
 
     if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(loadRuns, 2500);
+    pollRef.current = setInterval(async () => {
+      const run = await loadRuns();
+      if (run && (run.status === "done" || run.status === "error")) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setBusy(false);
+        const p = run.progress || run.result || {};
+        setTickMsg(
+          run.status === "error"
+            ? `Crawl error: ${run.error || "failed"}`
+            : `Done: ${p.ok ?? "—"}/${p.total ?? p.attempted ?? "—"} boards · ` +
+                `${p.passed ?? run.result?.jobs_passed_filter ?? "—"} India tech interns matched.`
+        );
+        await loadJobs();
+      } else if (run?.progress) {
+        const p = run.progress;
+        setTickMsg(
+          `Crawling… ${p.attempted ?? 0}/${p.total ?? "?"} companies · ` +
+            `${p.ok ?? 0} OK · ${p.passed ?? 0} matched`
+        );
+      }
+    }, 2500);
 
     try {
-      const secret = import.meta.env.VITE_SCHEDULER_SECRET || "";
-      const headers = { "Content-Type": "application/json" };
-      if (secret) headers["X-Scheduler-Secret"] = secret;
-
-      let res = await fetch(`${INTEL_API_BASE}/api/v1/crawlers/run?limit=25`, {
-        method: "POST",
-        headers,
+      const qs = new URLSearchParams({
+        batch_size: "30",
+        concurrency: "6",
+        require_india: String(filters.indiaOnly),
+        allow_remote: String(filters.allowRemote),
       });
-      let data = await res.json();
+      const res = await fetch(`${INTEL_API_BASE}/api/v1/crawlers/run-all?${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
       if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
-
-      setCrawlLogs(data.company_logs || []);
-      setTickMsg(
-        `Batch done: ${data.companies_ok}/${data.companies_attempted} boards OK · ` +
-          `${data.jobs_passed_filter} internships matched · ${data.jobs_new} new. ` +
-          `Click Run crawl again for the next batch of companies.`
-      );
-      await loadRuns();
-      await loadJobs();
+      setTickMsg(`Crawl started (run ${data.run_id}). Fetching all companies A→Z…`);
     } catch (e) {
       setTickMsg(`Crawl error: ${e.message}`);
-    } finally {
       if (pollRef.current) clearInterval(pollRef.current);
       setBusy(false);
-      setCrawlStatus("done");
+      setCrawlStatus("error");
     }
   };
 
@@ -186,7 +230,7 @@ export default function InternshipLinks() {
           <div>
             <h2 style={{ margin: 0 }}>Internship Links</h2>
             <p className="intel-sub">
-              Summer 2027 · Class of 2028 · India / Remote · live apply URLs
+              Tech interns · India{filters.allowRemote ? " / Remote" : ""} · live apply URLs
             </p>
           </div>
           <div className="intel-actions">
@@ -194,7 +238,7 @@ export default function InternshipLinks() {
               Seed companies
             </button>
             <button className="primary-btn" onClick={runCrawl} disabled={busy}>
-              {busy ? "Crawling…" : "Run crawl"}
+              {busy ? "Crawling all…" : "Run crawl (all)"}
             </button>
             <button className="primary-btn btn-muted" onClick={loadJobs} disabled={loading}>
               Refresh
@@ -217,14 +261,46 @@ export default function InternshipLinks() {
           </p>
         )}
 
-        <div className="intel-filters">
+        <div className="intel-filters intel-filter-bar">
+          <label title="Auto-selected">
+            <input
+              type="checkbox"
+              checked={filters.indiaOnly}
+              onChange={(e) => setFilter("indiaOnly", e.target.checked)}
+            />
+            India only
+          </label>
+          <label title="Also keep generic Remote (not US/UK-only)">
+            <input
+              type="checkbox"
+              checked={filters.allowRemote}
+              onChange={(e) => setFilter("allowRemote", e.target.checked)}
+            />
+            Allow remote
+          </label>
+          <label title="Auto-selected — intern / co-op / trainee only">
+            <input
+              type="checkbox"
+              checked={filters.internOnly}
+              onChange={(e) => setFilter("internOnly", e.target.checked)}
+            />
+            Interns only
+          </label>
+          <label title="Auto-selected — drop trading / quant">
+            <input
+              type="checkbox"
+              checked={filters.techOnly}
+              onChange={(e) => setFilter("techOnly", e.target.checked)}
+            />
+            Tech only (no trading)
+          </label>
           <label>
             <input
               type="checkbox"
               checked={newToday}
               onChange={(e) => setNewToday(e.target.checked)}
             />
-            New today only
+            New today
           </label>
           <label>
             <input
@@ -234,6 +310,13 @@ export default function InternshipLinks() {
             />
             My applications ({applications.length})
           </label>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => setFilters({ ...FILTER_DEFAULTS })}
+          >
+            Reset filters
+          </button>
           <input
             className="intel-search"
             placeholder="Filter company…"
@@ -305,7 +388,7 @@ export default function InternshipLinks() {
         {error && <p className="intel-msg err">{error}</p>}
         {!loading && !error && jobs.length === 0 && (
           <p className="intel-sub">
-            No matches yet. Click <b>Seed companies</b>, then <b>Run crawl</b>.
+            No matches yet. Click <b>Seed companies</b>, then <b>Run crawl (all)</b>.
           </p>
         )}
 
@@ -369,16 +452,16 @@ export default function InternshipLinks() {
           <div>
             <h3 style={{ margin: 0 }}>Crawl log</h3>
             <p className="intel-sub">
-              Per company: boards hit, internships found
+              All companies A→Z · concurrent batches
               {crawlStatus ? ` · status: ${crawlStatus}` : ""}
             </p>
           </div>
           {crawlProgress && (
             <span className="intel-count">
-              ok {crawlProgress.ok ?? crawlProgress.companies_ok ?? "—"} /{" "}
-              {crawlProgress.attempted ?? crawlProgress.companies_attempted ?? "—"}
-              {" · "}
-              matched {crawlProgress.passed ?? crawlProgress.jobs_passed_filter ?? "—"}
+              {crawlProgress.attempted ?? crawlProgress.ok ?? "—"} /{" "}
+              {crawlProgress.total ?? crawlProgress.companies_attempted ?? "—"}
+              {" · matched "}
+              {crawlProgress.passed ?? crawlProgress.jobs_passed_filter ?? "—"}
             </span>
           )}
         </div>
