@@ -333,6 +333,22 @@ tbody tr:hover {
   font-size: 14px;
 }
 
+.intel-filter-panel {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.intel-filter-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
 .intel-filter-bar label {
   display: inline-flex;
   align-items: center;

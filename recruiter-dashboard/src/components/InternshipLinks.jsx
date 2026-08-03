@@ -261,69 +261,75 @@ export default function InternshipLinks() {
           </p>
         )}
 
-        <div className="intel-filters intel-filter-bar">
-          <label title="Auto-selected">
+        <div className="intel-filter-panel">
+          <div className="intel-filter-panel-head">
+            <strong>Filters</strong>
+            <span className="intel-sub">Defaults: India · Interns · Tech only (no trading)</span>
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => setFilters({ ...FILTER_DEFAULTS })}
+            >
+              Reset to defaults
+            </button>
+          </div>
+          <div className="intel-filters intel-filter-bar">
+            <label title="Strict India locations">
+              <input
+                type="checkbox"
+                checked={filters.indiaOnly}
+                onChange={(e) => setFilter("indiaOnly", e.target.checked)}
+              />
+              India only
+            </label>
+            <label title="Also keep generic Remote (not US/UK-only)">
+              <input
+                type="checkbox"
+                checked={filters.allowRemote}
+                onChange={(e) => setFilter("allowRemote", e.target.checked)}
+              />
+              Allow remote
+            </label>
+            <label title="Intern / co-op / trainee titles only">
+              <input
+                type="checkbox"
+                checked={filters.internOnly}
+                onChange={(e) => setFilter("internOnly", e.target.checked)}
+              />
+              Interns only
+            </label>
+            <label title="Drop trading / quant / HFT">
+              <input
+                type="checkbox"
+                checked={filters.techOnly}
+                onChange={(e) => setFilter("techOnly", e.target.checked)}
+              />
+              Tech only (no trading)
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={newToday}
+                onChange={(e) => setNewToday(e.target.checked)}
+              />
+              New today
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={showTracked}
+                onChange={(e) => setShowTracked(e.target.checked)}
+              />
+              My applications ({applications.length})
+            </label>
             <input
-              type="checkbox"
-              checked={filters.indiaOnly}
-              onChange={(e) => setFilter("indiaOnly", e.target.checked)}
+              className="intel-search"
+              placeholder="Filter company…"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
             />
-            India only
-          </label>
-          <label title="Also keep generic Remote (not US/UK-only)">
-            <input
-              type="checkbox"
-              checked={filters.allowRemote}
-              onChange={(e) => setFilter("allowRemote", e.target.checked)}
-            />
-            Allow remote
-          </label>
-          <label title="Auto-selected — intern / co-op / trainee only">
-            <input
-              type="checkbox"
-              checked={filters.internOnly}
-              onChange={(e) => setFilter("internOnly", e.target.checked)}
-            />
-            Interns only
-          </label>
-          <label title="Auto-selected — drop trading / quant">
-            <input
-              type="checkbox"
-              checked={filters.techOnly}
-              onChange={(e) => setFilter("techOnly", e.target.checked)}
-            />
-            Tech only (no trading)
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={newToday}
-              onChange={(e) => setNewToday(e.target.checked)}
-            />
-            New today
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={showTracked}
-              onChange={(e) => setShowTracked(e.target.checked)}
-            />
-            My applications ({applications.length})
-          </label>
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => setFilters({ ...FILTER_DEFAULTS })}
-          >
-            Reset filters
-          </button>
-          <input
-            className="intel-search"
-            placeholder="Filter company…"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-          />
-          <span className="intel-count">{total} openings</span>
+            <span className="intel-count">{total} openings</span>
+          </div>
         </div>
 
         {showTracked && (
