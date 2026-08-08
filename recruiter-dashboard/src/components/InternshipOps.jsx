@@ -9,9 +9,8 @@ const CRAWL_DEFAULTS = {
 const CUSTOM_ADAPTERS = ["json_ld", "sitemap", "playwright"];
 
 export default function InternshipOps() {
-  const [companies, setCompanies] = useState([]);
   const [total, setTotal] = useState(0);
-  const [boardsTotal, setBoardsTotal] = useState(null);
+  const [crawlableTotal, setCrawlableTotal] = useState(null);
   const [providers, setProviders] = useState([]);
   const [importText, setImportText] = useState("");
   const [msg, setMsg] = useState("");
@@ -19,32 +18,72 @@ export default function InternshipOps() {
   const [crawlBusy, setCrawlBusy] = useState(false);
   const [crawlMsg, setCrawlMsg] = useState("");
   const [crawlProgress, setCrawlProgress] = useState(null);
+  const [crawlLogs, setCrawlLogs] = useState([]);
+  const [links, setLinks] = useState([]);
+  const [linksTotal, setLinksTotal] = useState(0);
   const [filters, setFilters] = useState(CRAWL_DEFAULTS);
-  const [edits, setEdits] = useState({});
   const pollRef = useRef(null);
+
+  const loadFetchedLinks = useCallback(async () => {
+    try {
+      const qs = new URLSearchParams({
+        limit: "100",
+        show_held: "true",
+        status: "open",
+        exclude_tracked: "false",
+        intern_only: "true",
+        tech_only: "true",
+      });
+      // When India-only is on, still prefer India matches but include held via show_held
+      if (filters.indiaOnly) qs.set("india_only", "false");
+      if (filters.allowRemote) qs.set("allow_remote", "true");
+      const res = await fetch(`${INTEL_API_BASE}/api/v1/jobs?${qs}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setLinks(data.items || []);
+      setLinksTotal(data.total ?? (data.items || []).length);
+    } catch {
+      /* ignore */
+    }
+  }, [filters]);
 
   const refresh = useCallback(async () => {
     try {
-      const [cRes, pRes] = await Promise.all([
-        fetch(`${INTEL_API_BASE}/api/v1/companies?limit=50&active=true`),
+      const [cRes, pRes, runRes] = await Promise.all([
+        fetch(`${INTEL_API_BASE}/api/v1/companies?limit=1&active=true`),
         fetch(`${INTEL_API_BASE}/api/v1/crawlers/providers`),
+        fetch(`${INTEL_API_BASE}/api/v1/crawlers/runs?limit=1`),
       ]);
       const cData = await cRes.json();
       const pData = await pRes.json();
-      setCompanies(cData.items || []);
       setTotal(cData.total || 0);
       setProviders(pData.providers || []);
-      const crawlable = (cData.items || []).filter(
-        (c) =>
-          c.board_token ||
-          (CUSTOM_ADAPTERS.includes(c.ats_provider) && c.careers_url)
-      ).length;
-      setBoardsTotal(crawlable);
-      setEdits({});
+
+      // Count crawlable custom adapters (cheap: three small queries)
+      const customCounts = await Promise.all(
+        CUSTOM_ADAPTERS.map(async (ats) => {
+          const r = await fetch(
+            `${INTEL_API_BASE}/api/v1/companies?limit=1&active=true&ats_provider=${ats}`
+          );
+          const d = await r.json();
+          return d.total || 0;
+        })
+      );
+      setCrawlableTotal(customCounts.reduce((a, b) => a + b, 0));
+
+      if (runRes.ok) {
+        const runData = await runRes.json();
+        const run = (runData.runs || [])[0];
+        if (run) {
+          setCrawlProgress(run.progress || run.result || null);
+          setCrawlLogs(run.company_logs || []);
+        }
+      }
+      await loadFetchedLinks();
     } catch (e) {
       setMsg(`Load error: ${e.message}`);
     }
-  }, []);
+  }, [loadFetchedLinks]);
 
   useEffect(() => {
     refresh();
@@ -110,6 +149,7 @@ export default function InternshipOps() {
         const run = await loadRun();
         if (!run) return;
         setCrawlProgress(run.progress || run.result || null);
+        setCrawlLogs(run.company_logs || []);
         if (run.status === "done" || run.status === "error") {
           clearInterval(pollRef.current);
           setCrawlBusy(false);
@@ -119,6 +159,7 @@ export default function InternshipOps() {
               ? `Crawl error: ${run.error || "failed"}`
               : `Done: ${p.ok ?? "—"}/${p.total ?? p.attempted ?? "—"} boards · ${p.passed ?? "—"} matched`
           );
+          await loadFetchedLinks();
         } else {
           const p = run.progress || {};
           setCrawlMsg(
@@ -150,60 +191,27 @@ export default function InternshipOps() {
     }
   };
 
-  const editFor = (c) =>
-    edits[c.id] || {
-      ats_provider: c.ats_provider || "unknown",
-      careers_url: c.careers_url || "",
-    };
-
-  const setEdit = (id, patch) => {
-    setEdits((prev) => ({
-      ...prev,
-      [id]: { ...(prev[id] || {}), ...patch },
-    }));
-  };
-
-  const saveCompany = async (c) => {
-    const body = editFor(c);
-    setBusy(true);
-    setMsg("");
-    try {
-      const res = await fetch(`${INTEL_API_BASE}/api/v1/companies/${c.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ats_provider: body.ats_provider,
-          careers_url: body.careers_url || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
-      setMsg(`Updated ${data.name}`);
-      await refresh();
-    } catch (e) {
-      setMsg(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const withBoard = companies.filter(
-    (c) =>
-      c.board_token || (CUSTOM_ADAPTERS.includes(c.ats_provider) && c.careers_url)
-  ).length;
+  const sampleLinks = crawlLogs.flatMap((row) =>
+    (row.samples || []).map((s) => ({
+      ...s,
+      company: row.company,
+      ats: row.ats,
+      passed: s.passed,
+    }))
+  );
 
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Companies & Crawlers</h2>
       <p style={{ color: "var(--text-muted)" }}>
-        {total} companies in DB · {withBoard} crawlable on this page
-        {boardsTotal != null ? ` (sample)` : ""} · {providers.length} adapters
+        {total} companies · {crawlableTotal != null ? `${crawlableTotal} custom scrapers` : "…"} ·{" "}
+        {providers.length} adapters · {linksTotal} intern links in DB
       </p>
 
       <div className="intel-filter-panel" style={{ marginBottom: 16 }}>
         <div className="intel-filter-panel-head">
           <strong>Crawl filters</strong>
-          <span className="intel-sub">Applied when you run crawl</span>
+          <span className="intel-sub">Applied when you run crawl / when listing links</span>
         </div>
         <div className="intel-filters intel-filter-bar">
           <label>
@@ -224,8 +232,7 @@ export default function InternshipOps() {
           </label>
         </div>
         <p className="intel-sub" style={{ margin: "8px 0 0" }}>
-          Tech-only + interns-only are always enforced by the crawler. Custom pages use{" "}
-          <code>json_ld</code> / <code>sitemap</code> / <code>playwright</code> + careers URL.
+          After deploy: click <b>Seed companies</b> so custom careers URLs load, then crawl.
         </p>
       </div>
 
@@ -233,20 +240,25 @@ export default function InternshipOps() {
         <button className="primary-btn" onClick={seed} disabled={busy || crawlBusy}>
           Seed companies
         </button>
-        <button
-          className="primary-btn"
-          onClick={runCrawlAll}
-          disabled={busy || crawlBusy}
-        >
+        <button className="primary-btn" onClick={runCrawlAll} disabled={busy || crawlBusy}>
           {crawlBusy ? "Crawling all…" : "Run crawl (all companies)"}
         </button>
-        <button className="primary-btn" onClick={refresh} style={{ background: "#334155" }}>
-          Refresh
+        <button
+          className="primary-btn"
+          onClick={refresh}
+          style={{ background: "#334155" }}
+          disabled={crawlBusy}
+        >
+          Refresh links
         </button>
       </div>
 
       {crawlMsg && (
-        <p className={crawlMsg.includes("error") || crawlMsg.includes("Error") ? "intel-msg err" : "intel-msg"}>
+        <p
+          className={
+            crawlMsg.includes("error") || crawlMsg.includes("Error") ? "intel-msg err" : "intel-msg"
+          }
+        >
           {crawlMsg}
         </p>
       )}
@@ -266,7 +278,7 @@ export default function InternshipOps() {
       <textarea
         value={importText}
         onChange={(e) => setImportText(e.target.value)}
-        rows={5}
+        rows={4}
         style={{
           width: "100%",
           padding: 12,
@@ -281,72 +293,76 @@ export default function InternshipOps() {
         Import
       </button>
 
-      <h3 style={{ marginTop: 24 }}>Sample companies</h3>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
-              <th style={{ padding: 8 }}>Name</th>
-              <th style={{ padding: 8 }}>Adapter</th>
-              <th style={{ padding: 8 }}>Board / Careers URL</th>
-              <th style={{ padding: 8 }} />
-            </tr>
-          </thead>
-          <tbody>
-            {companies.map((c) => {
-              const e = editFor(c);
-              const isCustom = CUSTOM_ADAPTERS.includes(e.ats_provider);
-              return (
-                <tr key={c.id} style={{ borderBottom: "1px solid var(--border)", verticalAlign: "top" }}>
-                  <td style={{ padding: 8 }}>{c.name}</td>
+      <h3 style={{ marginTop: 24 }}>Fetched internship links</h3>
+      <p className="intel-sub">
+        Live apply URLs from the latest crawl / DB (intern + tech). Click a link to open.
+      </p>
+      <div style={{ overflowX: "auto", marginBottom: 24 }}>
+        {links.length === 0 ? (
+          <p className="intel-sub">No links yet — seed, then run crawl.</p>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                <th style={{ padding: 8 }}>Company</th>
+                <th style={{ padding: 8 }}>Title</th>
+                <th style={{ padding: 8 }}>Source</th>
+                <th style={{ padding: 8 }}>Location</th>
+                <th style={{ padding: 8 }}>Filter</th>
+                <th style={{ padding: 8 }}>Link</th>
+              </tr>
+            </thead>
+            <tbody>
+              {links.map((j) => (
+                <tr key={j.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                  <td style={{ padding: 8 }}>{j.company_name}</td>
+                  <td style={{ padding: 8 }}>{j.title}</td>
+                  <td style={{ padding: 8 }}>{j.ats_provider || j.source || "—"}</td>
+                  <td style={{ padding: 8 }}>{j.location_text || (j.is_remote ? "Remote" : "—")}</td>
+                  <td style={{ padding: 8 }}>{j.filter_pass ? "pass" : "held"}</td>
                   <td style={{ padding: 8 }}>
-                    <select
-                      value={e.ats_provider}
-                      onChange={(ev) => setEdit(c.id, { ats_provider: ev.target.value })}
-                      style={{ maxWidth: 140 }}
-                    >
-                      {[
-                        ...new Set([
-                          e.ats_provider,
-                          ...(providers.length ? providers : CUSTOM_ADAPTERS),
-                          "unknown",
-                        ]),
-                      ].map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td style={{ padding: 8, minWidth: 220 }}>
-                    {isCustom ? (
-                      <input
-                        type="url"
-                        value={e.careers_url}
-                        placeholder="https://…/careers"
-                        onChange={(ev) => setEdit(c.id, { careers_url: ev.target.value })}
-                        style={{ width: "100%", padding: 6 }}
-                      />
-                    ) : (
-                      <span>{c.board_token || c.careers_url || "—"}</span>
-                    )}
-                  </td>
-                  <td style={{ padding: 8 }}>
-                    <button
-                      className="primary-btn"
-                      style={{ background: "#334155", padding: "4px 10px", fontSize: 12 }}
-                      disabled={busy}
-                      onClick={() => saveCompany(c)}
-                    >
-                      Save
-                    </button>
+                    <a href={j.apply_url} target="_blank" rel="noreferrer">
+                      Open →
+                    </a>
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      {sampleLinks.length > 0 && (
+        <>
+          <h3>Latest crawl samples</h3>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                  <th style={{ padding: 8 }}>Company</th>
+                  <th style={{ padding: 8 }}>Adapter</th>
+                  <th style={{ padding: 8 }}>Title</th>
+                  <th style={{ padding: 8 }}>Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sampleLinks.slice(0, 80).map((s, i) => (
+                  <tr key={`${s.url}-${i}`} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: 8 }}>{s.company}</td>
+                    <td style={{ padding: 8 }}>{s.ats}</td>
+                    <td style={{ padding: 8 }}>{s.title}</td>
+                    <td style={{ padding: 8 }}>
+                      <a href={s.url} target="_blank" rel="noreferrer">
+                        Open →
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
